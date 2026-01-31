@@ -40,4 +40,45 @@ public class MyUnitTests {
         Mockito.verify(productRepository, Mockito.times(1)).save(product);
         Mockito.verify(notificationService, Mockito.times(1)).sendDelayNotification(product.getLeadTime(), product.getName());
     }
+
+    @Test
+    public void shouldDelegateToNormalHandlerForNormalProduct() {
+        // GIVEN
+        Product product = new Product(1L, 15, 10, ProductCateg.NORMAL, "USB Cable", null, null, null);
+
+        // WHEN
+        productService.processProduct(product);
+
+        // THEN
+        verify(normalProductHandler).handle(product);
+        verifyNoMoreInteractions(seasonalProductHandler, expirableProductHandler);
+    }
+
+    @Test
+    public void shouldDelegateToSeasonalHandlerForSeasonalProduct() {
+        // GIVEN
+        Product product = new Product(1L, 15, 10, ProductCateg.SEASONAL, "Watermelon", null, null, null);
+
+        // WHEN
+        productService.processProduct(product);
+
+        // THEN
+        verify(seasonalProductHandler).handle(product);
+        verifyNoMoreInteractions(normalProductHandler, expirableProductHandler);
+    }
+
+    @Test
+    public void shouldDelegateToExpirableHandlerForExpirableProduct() {
+        // GIVEN
+        Product product = new Product(1L, 15, 10, ProductCateg.EXPIRABLE, "Butter", null, null, null);
+
+        // WHEN
+        productService.processProduct(product);
+
+        // THEN
+        verify(expirableProductHandler).handle(product);
+        verifyNoMoreInteractions(normalProductHandler, seasonalProductHandler);
+    }
+
+
 }

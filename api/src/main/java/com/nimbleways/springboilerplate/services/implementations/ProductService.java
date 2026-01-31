@@ -1,49 +1,31 @@
 package com.nimbleways.springboilerplate.services.implementations;
 
-import java.time.LocalDate;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
 import com.nimbleways.springboilerplate.entities.Product;
-import com.nimbleways.springboilerplate.repositories.ProductRepository;
+import com.nimbleways.springboilerplate.entities.ProductCateg;
+import com.nimbleways.springboilerplate.services.productCategHandler.ExpirableProductHandler;
+import com.nimbleways.springboilerplate.services.productCategHandler.NormalProductHandler;
+import com.nimbleways.springboilerplate.services.productCategHandler.SeasonalProductHandler;
+import org.springframework.stereotype.Service;
+import java.util.Map;
 
 @Service
 public class ProductService {
 
-    @Autowired
-    ProductRepository pr;
+    private final Map<ProductCateg, ProductHandler> handlers;
 
-    @Autowired
-    NotificationService ns;
-
-    public void notifyDelay(int leadTime, Product p) {
-        p.setLeadTime(leadTime);
-        pr.save(p);
-        ns.sendDelayNotification(leadTime, p.getName());
+    public ProductService(NormalProductHandler normalHandler,SeasonalProductHandler seasonalHandler,ExpirableProductHandler expirableHandler) {
+        this.handlers = Map.of(
+                ProductCateg.NORMAL, normalHandler,
+                ProductCateg.SEASONAL, seasonalHandler,
+                ProductCateg.EXPIRABLE, expirableHandler
+        );
     }
 
-    public void handleSeasonalProduct(Product p) {
-        if (LocalDate.now().plusDays(p.getLeadTime()).isAfter(p.getSeasonEndDate())) {
-            ns.sendOutOfStockNotification(p.getName());
-            p.setAvailable(0);
-            pr.save(p);
-        } else if (p.getSeasonStartDate().isAfter(LocalDate.now())) {
-            ns.sendOutOfStockNotification(p.getName());
-            pr.save(p);
-        } else {
-            notifyDelay(p.getLeadTime(), p);
+    public void processProduct(Product product) {
+        ProductHandler handler = handlers.get(product.getType());
+        if (handler == null) {
+            throw new IllegalArgumentException("Type de produit est inconnu : " + product.getType());
         }
-    }
-
-    public void handleExpiredProduct(Product p) {
-        if (p.getAvailable() > 0 && p.getExpiryDate().isAfter(LocalDate.now())) {
-            p.setAvailable(p.getAvailable() - 1);
-            pr.save(p);
-        } else {
-            ns.sendExpirationNotification(p.getName(), p.getExpiryDate());
-            p.setAvailable(0);
-            pr.save(p);
-        }
+        handler.handleProduct(product);
     }
 }
